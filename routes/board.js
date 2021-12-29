@@ -4,7 +4,7 @@ var router = express.Router();
 //npm i mongodb --save
 const db = require('mongodb').MongoClient;
 // mongodb://아이디:암호@서버주소:포트번호/DB명
-const dbUrl = 'mongodb://id215:pw215@1.234.5.158:37017/db215';
+const dbUrl = require('../config/db').mongodbURL;
 
 //get(조회), post(추가), put(수정), delete(삭제)
 
@@ -23,7 +23,7 @@ router.post('/insert', async function(req, res, next) {
         // 1회만
         const dbConn = await db.connect(dbUrl);
 
-        const coll = dbConn.db("db215").collection("seqboard");
+        const coll = dbConn.db("db215").collection("sequence");
         // 글번호 자동으로 {가져오기}, {수정하기}
         // _id 가 SEQ_BOARD_NO인것을 가지고 오고,
         // seq값을 기존값에 1증가시킴
@@ -137,22 +137,28 @@ router.put('/updatehit', async function(req, res, next){
 });
 
 //게시물 삭제 : http://localhost:3000/board/delete
+// paramter은 글번호 no
 router.delete('/delete', async function(req, res, next){
     try{
-        
+        //문자를 숫자로 number( 바꿀문자 )
+        //숫자를 문자로 string( 바꿀숫자 )
         const no = Number(req.query.no);
+        //바로 처리안되는 경우 await 사용 사용시 (async)
         const dbConn = await db.connect(dbUrl);
-        const coll = dbConn.db("db215").collection("board");
-
-        const result = await coll.deleteOne(
+        const collection = dbConn.db("db215").collection("board");
+        const result = await collection.deleteOne(
             {_id : no},
         );
-        console.log(result);
-        return res.send({status:200});
+        console.log(result);// 삭제가 되던 안되던 성공
+        if(result.deletedCount === 1){
+            return res.send({status:200});
+        }
+        return res.send({status:0});
     }
+    //소스코드 오타, BD접속X(꺼짐등)등 물리적 오류 발생시
     catch(err){
         console.error(err);
-        return res.send({status:-1, result : err});
+        return res.send({status:-1, result : err}); //시스템 오류
     }
 
 });
@@ -161,21 +167,21 @@ router.delete('/delete', async function(req, res, next){
 router.put('/update', async function(req, res, next){
     try{
         //제목, 내용만 수정가능 + 조건으로 사용할 글번호
-        const no = Number(req.query.no); 
+        const no = Number(req.body.no); 
         const title = req.body.title;
-        const content = req.body.const;
+        const content = req.body.content;
         const dbConn = await db.connect(dbUrl);
-        const coll = dbConn.db("db215").collection("board");
-        
-        const result = await coll.updateOne(
-            {_id : no},
-            {_$set : {title:title, content:content}},
+        const collection = dbConn.db("db215").collection("board");
+        const result = await collection.updateOne(
+            {_id : no}, //조건
+            {$set : {title:title, content:content}},//실제 변경할내용
         );
         console.log(result);
         if(result.modifiedCount === 1){
-            return res.send({status:200, result:result});
+        return res.send({status:200});
         }
-        return res.send({status:-1});
+        return res.send({status:0});
+
     }
     catch(err){
         console.error(err);
@@ -184,9 +190,66 @@ router.put('/update', async function(req, res, next){
 
 });
 
-//이전글
+//이전글 : http://localhost:3000/board/prevno
+router.get('/prevno', async function(req, res, next){
+    try{
+        const no = Number(req.query.cno);
+        const dbConn = await db.connect(dbUrl);
+        const collection = dbConn.db("db215").collection("board");
+        //미만 {$lt : }     직다 
+        //이하 {$lte : }    작거나 같다
+        //초과 {$gt :  }    크다
+        //이상 {$gte : }    크거나 같다
+        // $set  $and   $or
+        const result = await collection.find(
+            {_id : {$lt: no}}, //조건
+            {projection : {_id : 1}} //필요한 항목만(_id만)
+        ).sort({_id :-1}).limit(1).toArray();
 
-//다음글
+        // result [ { _id: 78 } ] => result[0]._id
+        //[{}], []
+        console.log(result);
+        if(result.length===1){
+            return res.send({status:200, no:result[0]._id});
+        }
+        return res.send({status:200, no:0});
+        
+    }
+    catch(err){
+        console.error(err);
+        return res.send({status:-1, result : err});
+    }
+});
+//다음글 : http://localhost:3000/board/nextvno
+router.get('/nextvno', async function(req, res, next){
+    try{
+        const no = Number(req.query.cno);
+        const dbConn = await db.connect(dbUrl);
+        const collection = dbConn.db("db215").collection("board");
+        //미만 {$lt : }     직다 
+        //이하 {$lte : }    작거나 같다
+        //초과 {$gt :  }    크다
+        //이상 {$gte : }    크거나 같다
+        // $set  $and   $or
+        const result = await collection.find(
+            {_id : {$gt: no}}, //조건
+            {projection : {_id : 1}} //필요한 항목만(_id만)
+        ).sort({_id :1}).limit(1).toArray();
+
+        // result [ { _id: 78 } ] => result[0]._id 배열안에 아이디만 빼기
+        //[{}], []
+        console.log(result);
+        if(result.length===1){
+            return res.send({status:200, no:result[0]._id});
+        }
+        return res.send({status:200, no:0});
+        
+    }
+    catch(err){
+        console.error(err);
+        return res.send({status:-1, result : err});
+    }
+});
 
 
 module.exports = router;
