@@ -118,7 +118,7 @@ router.get('/selectone', async function(req, res, next){
 
         //이미지 데이터를 전달하는게 아님, 
         //이미지를 볼수있는 url을 전달
-        result['image'] ='/item/image?no=' + code;
+        result['image'] ='/item/image?no=' + code + '$dt=' + new Date().getTime();
         return res.send({status:200, result:result});
 
     }
@@ -207,6 +207,131 @@ router.put('/update', upload.single("file"), async function(req, res, next){
     }
 });
 
+// 물품일괄등록 : http://localhost:3000/item/insertbatch
+router.post('/insertbatch', upload.array("file"), async function(req, res, next){
+    try{
+        const dbConn = await db.connect(DBURL);
+        const coll = dbConn.db(DBNAME).collection("sequence");
 
+        const count = req.body.name.length;
 
+        //const aaa = ['aaa', 'bbb', 'ccc']; 
+        //aaa.length => 3
+        //console.log(aaa[0])
+        
+        let arr=[]; // [{},{},{},{}]
+        for(let i=0; i< count; i++){
+            const result = await coll.findOneAndUpdate(
+                {_id:'SEQ_ITEM_NO'}, {$inc : {seq : 1}}
+            );
+            const obj ={
+                _id : result.value.seq,
+                name : req.body.name[i],
+                content : req.body.content[i],
+                price : req.body.price[i],
+                quantity : req.body.quantity[i],
+                filename : req.files[i].originalname,
+                filedata : req.files[i].buffer,
+                filetype : req.files[i].mimetype,
+                filesize : req.files[i].size,
+                regdate : new Date()
+            };
+
+            arr.push(obj);
+        }
+
+        const coll1 = dbConn.db(DBNAME).collection("item");
+        const result1 = await coll1.insertMany(arr);//[{},{}]
+        console.log(result1);
+
+        if(result1.insertedCount===count){
+            return res.send({status : 200});
+        }
+        return res.send({status:0});
+    }
+    catch(err){
+        console.error(err);
+        return res.send({status:-1, result : err});
+    }
+});
+
+// 물품일괄삭제 : http://localhost:3000/item/deletebatch
+router.delete('/deletebatch', async function(req, res, next){
+    try{
+
+        //req.body =>{code : [10115, 10114, 10113]}
+        //             req.body.code[0], req.bodt.code[1]
+        //[ { code: 10115 }, { code: 10114 }, { code: 10113 } ]
+        //   req.body[0].code           
+        console.log(req.body);
+        let arr = [];
+        for(let i=0; i< req.body.length; i++){ // 0,1,2..
+            arr.push(req.body[i].code);
+        }
+        
+        const dbConn = await db.connect(DBURL);
+        const coll = dbConn.db(DBNAME).collection("item");
+
+        const result = await coll.deleteMany({
+            _id : {$in : arr}
+        });
+        console.log(result);
+
+        if(result.deletedCount ==req.body.length){
+            return res.send({status:200});
+        }
+        return res.send({status:0});
+    }
+    catch(err){
+        console.error(err);
+        return res.send({status:-1, result : err});
+    }
+});
+
+// 물품일괄수정 : http://localhost:3000/item/updatebatch
+router.put('/updatebatch', upload.array("file"), async function(req, res, next){
+    try{
+        const count = req.body.name.length;
+
+        const dbConn = await db.connect(DBURL);
+        const coll = dbConn.db(DBNAME).collection("item");
+
+        let cnt = 0; //변경한 라인의 숫자
+
+        for(let i=0; i<count; i++){
+
+            let obj = {
+                name : req.body.name[i],
+                content : req.body.content[i],
+                price : req.body.price[i],
+                quantity : req.body.quantity[i]
+
+            };
+
+            //req.files ==> [{},{}]
+            if(typeof req.files[i] !== 'undefined'){
+                obj['filename'] = req.files[i].originalname,
+                obj['filedata'] = req.files[i].buffer,
+                obj['filetype'] = req.files[i].mimetype,
+                obj.filesize = req.files[i].size
+            }
+
+            const result = await coll.updateOne( // 0 1 2
+                {_id : Number(req.body.code[i])  }, //조건
+                {$set : obj}
+            );
+            console.log(result); 
+
+            cnt += result.modifiedCount; // cnt에 누적하기
+        }
+        if(cnt === count){
+            return res.send({status:200});
+        }
+        return res.send({status:0});
+    }
+    catch(err){
+        console.error(err);
+        return res.send({status:-1, result : err});
+    }
+});
 module.exports = router;
