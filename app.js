@@ -8,6 +8,7 @@ var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
 var boardRouter = require('./routes/board'); // 추가됨. board.js----------------------------------
 var itemRouter = require('./routes/item');
+var memberRouter = require('./routes/member');
 
 var app = express();
 
@@ -25,6 +26,7 @@ app.use('/', indexRouter);
 app.use('/users', usersRouter);
 app.use('/board', boardRouter); //추가됨.--------------------------------------------------
 app.use('/item', itemRouter);
+app.use('/member', memberRouter);
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {

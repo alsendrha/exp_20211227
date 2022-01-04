@@ -47,7 +47,7 @@ router.post('/insert', async function(req, res, next) {
         if(result1.insertedId > 0){
             return res.send({status:200});
         }
-        return send({status:-1});
+        return res.send({status:-1});
 
     }
     catch(err){

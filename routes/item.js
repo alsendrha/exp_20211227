@@ -118,8 +118,10 @@ router.get('/selectone', async function(req, res, next){
 
         //이미지 데이터를 전달하는게 아님, 
         //이미지를 볼수있는 url을 전달
-        result['image'] ='/item/image?no=' + code + '$dt=' + new Date().getTime();
+        result['image'] ='/item/image?no=' + code + '&dt=' + new Date().getTime();
         return res.send({status:200, result:result});
+        
+        
 
     }
     catch(err){
@@ -259,15 +261,16 @@ router.post('/insertbatch', upload.array("file"), async function(req, res, next)
 router.delete('/deletebatch', async function(req, res, next){
     try{
 
-        //req.body =>{code : [10115, 10114, 10113]}
+        // 방법 1 req.body =>{code : [10115, 10114, 10113]}
         //             req.body.code[0], req.bodt.code[1]
-        //[ { code: 10115 }, { code: 10114 }, { code: 10113 } ]
+        // 방법2 [ { code: 10115 }, { code: 10114 }, { code: 10113 } ]
         //   req.body[0].code           
         console.log(req.body);
         let arr = [];
         for(let i=0; i< req.body.length; i++){ // 0,1,2..
             arr.push(req.body[i].code);
         }
+        console.log(arr);
         
         const dbConn = await db.connect(DBURL);
         const coll = dbConn.db(DBNAME).collection("item");
@@ -334,4 +337,53 @@ router.put('/updatebatch', upload.array("file"), async function(req, res, next){
         return res.send({status:-1, result : err});
     }
 });
+
+// 체크항목 조회하기 : http://localhost:3000/item/selectcheck
+//{"chks":[10130, 10131, 10132]} => req.body.chks[0]
+//[{ chks: 10130 }, { chks: 10131 }, => { chks: 10132 }] req.body[0].chk
+router.post('/selectcheck', async function(req, res, next){
+    try {
+        const chks = req.body.chks; //[10130, 10131, 10132]
+        console.log(chks);
+
+        const dbConn = await db.connect(DBURL);
+        const coll = dbConn.db(DBNAME).collection("item");
+
+        // {_id : 10130 } === {_id : {$eq{:10132}} 하나만            EQ
+        // {_id : {$ne {:10132}} 이것만 뺴고                          NE
+         // {_id : {$in :[10130, 10131, 10132]}} 세개를 가져와               IN
+        // {$or : [{_id : 10130}, {_id : 10131}]} 이거 아니면 저거         OR
+        // {$and : [{_id : 10130}, {name : aaa}]} 이아이디와 이이름인것만   AND
+        //{_id : {$gt : 10130}}                      큰거
+        //{_id : {$gte : 10130}}                     크거나 같은거
+        //{_id : {$lt : 10130}}                       작은거
+        //{_id : {$lte : 10130}}                     작거나 같은거
+        const result = await coll.find(
+            {_id : {$in : chks }},
+            {projection : {filedata : 0, filename : 0, filetype : 0, filesize : 0}}
+            )       // chks = [10130, 10131, 10132]
+        .sort({_id : -1}).toArray();  
+        
+        //[{0}, {1}, {2}] => result[0]['image']
+        // for(let i=0;i<result.length;i++){
+        //     result[i]['image'] = 'item/image?no='+result[i]._id;
+        // } 번호가 있는건 이거 사용
+        for(let tmp of result){
+            tmp['image'] = 'item/image?no='+tmp._id; // 번호가 없는건 이거 사용
+        }
+
+        console.log(result) ; // key가 7개인 object로 변경
+
+        return res.send({status:200, result:result});
+
+    }
+    catch(err){
+        console.error(err);
+        return res.send({status:-1, result : err});
+    }
+
+});
+
+
+
 module.exports = router;
