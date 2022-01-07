@@ -55,7 +55,7 @@ router.put('/mypage', checkToken, async function(req, res, nest){
                 {_id : req.body.userid}, // 조건
                 {$set : { 
                         userage : req.body.userage, 
-                        userdmail:req.body.useremail
+                        useremail:req.body.useremail
                         } 
                 }, // 변경내용
             );
@@ -210,6 +210,32 @@ router.get('/idcheck', async function(req, res, next) {
         console.log(result);
         return res.send({status:200, result:result});
 
+    }
+    catch(err){
+        console.error(err);
+        return res.send({status:-1, result : err});
+    }
+});
+
+// 회원목록 : http://localhost:3000/member/select
+router.get('/select', async function(req, res, next){
+    try {
+        const page = Number(req.query.page);
+        const text = req.query.text;
+
+        const dbConn = await db.connect(DBURL);
+        const coll = dbConn.db(DBNAME).collection("member");
+
+        const query = { _id : new RegExp(text, 'i') };
+
+        const result = await coll.find(query)
+                                .sort({_id : -1})   // 1 오름차순, -1 내림차순
+                                .skip((page-1)*10)            // 생략할 개수
+                                .limit(10)          //10개 까지만
+                                .toArray();
+        console.log(result);
+        const total = await coll. countDocuments(query);
+        return res.send({status:200, result:result, total:total});
     }
     catch(err){
         console.error(err);

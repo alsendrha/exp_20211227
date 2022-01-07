@@ -81,11 +81,12 @@ router.get('/selectone', async function(req, res, next){
     }
 });
 
-// 게시물 목록 : http://localhost:3000/board/select
+// 게시물 목록 : http://localhost:3000/board/select?page=1&text=검색어
 router.get('/select', async function(req, res, next){
     try {
         // 페이지 정보가 전달
         const page = Number(req.query.page);
+        const text = req.query.text;
         // 1-> skip(0) -> skip(  ( page-1 )*10   )
         // 2-> skip(10)
         // 3-> skip(20)
@@ -94,14 +95,17 @@ router.get('/select', async function(req, res, next){
         const coll = dbConn.db("db215").collection("board");
 
         // 여러개 가져오기 find()...... toArray()변환
-        const result = await coll.find({  })
+        // 정규표현식 => new RegExp(검색단어, ignore 대소문자무시) 대소문자 구분하려면 i 빼기
+        // 이메일 정확, 전화번호 정확
+        const query = { title : new RegExp(text, 'i') };
+        const result = await coll.find(query)
                                 .sort({_id : -1})   // 1 오름차순, -1 내림차순
                                 .skip((page-1)*10)            // 생략할 개수
                                 .limit(10)          //10개 까지만
                                 .toArray();
         console.log(result);
         //페이지네이션에서 사용할 전체 개시물 수
-        const total = await coll. countDocuments({});
+        const total = await coll. countDocuments(query);
 
         return res.send({status:200, result:result, total:total});
     }
